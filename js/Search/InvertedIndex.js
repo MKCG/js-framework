@@ -76,7 +76,9 @@ class InvertedIndex
         }
 
         let ids = [];
-        let tokens = value.split(' ')
+        let tokens = value.normalize('NFD')
+            .replace(/[\u0300-\u036f,!?;:]/g, "")
+            .split(' ')
             .filter((v) => v !== '')
             .map((value) => value.toLowerCase());
 
@@ -168,7 +170,9 @@ class InvertedIndex
     }
 
     tokenize(value) {
-        return value.split(' ')
+        return value.normalize('NFD')
+            .replace(/[\u0300-\u036f,!?;:]/g, "")
+            .split(' ')
             .filter(function(value, index, array) {
                 return value !== '' && array.indexOf(value) === index;
             })
