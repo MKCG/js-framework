@@ -30,36 +30,6 @@ class Router extends Component
     }
 }
 
-class Store extends Component
-{
-    constructor(type) {
-        super();
-
-        this.type = type;
-        this.storage = [];
-    }
-
-    add(id, data) {
-        this.storage[id] = data;
-        this.notify('add', id, data);
-    }
-
-    update(id, data) {
-        let old = this.storage[id];
-
-        this.storage[id] = data;
-        this.notify('update', id, old, data);
-    }
-
-    delete(id) {
-        let old = this.storage[id];
-
-        delete this.storage[id];
-        this.notify('delete', id, old);
-    }
-}
-
-
 class ModelOrchestrator extends Component
 {
     constructor() {
@@ -98,13 +68,21 @@ class ModelOrchestrator extends Component
 
 class Model extends Component
 {
-    constructor(store, orchestrator) {
+    constructor(orchestrator) {
         super();
 
-        this.store = store;
+        this.stores = [];
         this.orchestrator = orchestrator;
+    }
 
-        this.store.addListener('add', function(id, data) {
+    addStore(store) {
+        if (this.stores.indexOf(store) > -1) {
+            return;
+        }
+
+        this.stores.push(store);
+
+        store.addListener('add', function(id, data) {
             let callback = function(id, data) {
                 console.log(id, data);
             }.bind(this);
@@ -116,7 +94,7 @@ class Model extends Component
             }
         }.bind(this));
 
-        this.store.addListener('delete', function(id, data) {
+        store.addListener('delete', function(id, data) {
             let callback = function(id, data) {
                 console.log(id, data);
             }.bind(this);
@@ -128,7 +106,7 @@ class Model extends Component
             }
         }.bind(this));
 
-        this.store.addListener('update', function(id, oldData, newData) {
+        store.addListener('update', function(id, oldData, newData) {
             let callback = function(id, oldData, newData) {
                 console.log(id, oldData, newData);
             }.bind(this);
@@ -144,10 +122,11 @@ class Model extends Component
 
 
 
-
 let store = new Store(),
     orchestrator = new ModelOrchestrator(),
-    model = new Model(store, orchestrator);
+    model = new Model(orchestrator);
+
+model.addStore(store);
 
 orchestrator.increaseLock();
 
