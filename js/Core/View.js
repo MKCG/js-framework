@@ -65,6 +65,6 @@ class DocumentListView extends ViewComponent
         }
 
         this.rendered = data.ids;
-        super.render({data: data.documents});
+        super.render({items: data.documents});
     }
 }

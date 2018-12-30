@@ -59,7 +59,7 @@
 
     <script type="text/javascript">
         let template =
-            '{{# loop data }}' +
+            '{{# loop items }}' +
                 '{{# if _key % 2 == 0 }}' +
                     '<div class="row">' +
                 '{{/ endif }}' +
@@ -198,7 +198,7 @@
 
 
         document.addEventListener('click', function(event) {
-            debugger;
+            // debugger;
         });
 
         searchEngine.start();

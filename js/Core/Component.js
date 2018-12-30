@@ -15,9 +15,13 @@ class Component {
         this.listeners[type].push(callback);
     }
 
-    notify(type, data) {
+    notify(type, ...data) {
+        if (this.listeners[type] === undefined) {
+            return;
+        }
+
         for (let i = 0; i < this.listeners[type].length; i++) {
-            this.listeners[type][i](data);
+            this.listeners[type][i](...data);
         }
     }
 }
