@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>My Little Resume brewed with love</title>
+
+    <script type="text/javascript" src="js/Utils.js"></script>
+
+    <!-- Core classes -->
+    <script type="text/javascript" src="js/Core/Component.js"></script>
+    <script type="text/javascript" src="js/Core/View.js"></script>
+    <script type="text/javascript" src="js/Core/Template.js"></script>
+    <script type="text/javascript" src="js/Core/Kernel.js"></script>
+
+    <!-- Search engine classes -->
+    <script type="text/javascript" src="js/Search/InvertedIndex.js"></script>
+    <script type="text/javascript" src="js/Search/Engine.js"></script>
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css">
+    <link rel="stylesheet" href="css/main.css">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+</head>
+<body>
+    <main>
+        <div class="navbar-fixed">
+            <nav class="grey darken-2">
+                <div class="nav-wrapper">
+                    <ul class="right hide-on-med-and-down">
+                        <li class="active">
+                            <a href="#home"><i class="material-icons left">account_circle</i>About</a>
+                        </li>
+                        <li>
+                            <a href="#behat"><i class="material-icons left">search</i>Behat</a>
+                        </li>
+                        <li>
+                            <a href="#brew-ui"><i class="material-icons left">search</i>BrewUI</a>
+                        </li>
+                    </ul>
+                </div>
+            </nav>
+        </div>
+        <div class="row content">
+
+            <div class="col s12 m4 l3 xl2">
+                <ul>
+                    <li>Yo !</li>
+                    <li><a href="#!">Second Sidebar Link</a></li>
+                </ul>
+            </div>
+
+            <div class="col s12 m8 l9 xl10">
+                <input type="text" name="searchBar" id="searchBar" placeholder="Rechercher...">
+
+                <div id="resultCount" class="right-align"></div>
+                <div id="results" class="searchResults"></div>
+            </div>
+
+        </div>
+    </main>
+
+    <script type="text/javascript">
+        let template =
+            '{{# loop data }}' +
+                '{{# if _key % 2 == 0 }}' +
+                    '<div class="row">' +
+                '{{/ endif }}' +
+                '<div id="statement-{{ id }}" class="col s12 m12 l6">' + 
+                    '<div class="card grey z-depth-2">' +
+                        '<div class="card-content white-text">' +
+                            '<span class="card-title">{{ type | toUpperCase }} {{ value }}</span>' +
+                            '{{# if parameters.length > 0 }}' +
+                                '<ul>' +
+                                    '{{# loop parameters }}' +
+                                        '<li>' +
+                                            '{{ _name | toUpperCase }} : {{ type }}' +
+                                        '</li>' +
+                                    '{{/ loop }}' +
+                                '</ul>' +
+                            '{{/ endif }}' +
+                        '</div>' +
+                    '</div>' +
+                '</div>' +
+                '{{# if _key % 2 == 1 }}' +
+                    '</div>' +
+                '{{/ endif }}' +
+            '{{/ loop }}';
+
+        const
+            viewBuilder = new ViewBuilder(new TemplateEngine()),
+            searchEngine = SearchEngineBuilder.create(),
+            statementList = viewBuilder.create('DocumentListView', 'results', template),
+            resultCount = viewBuilder.create('TimerView', 'resultCount', '{{ count }} results found in {{ took }}ms');
+
+        searchEngine.addListener('search', function() {
+            this.startTimer();
+        }.bind(resultCount));
+
+        searchEngine.addListener('results', function(results) {
+            let took = this.took();
+            this.render({count: results.ids.length, took: took});
+        }.bind(resultCount));
+
+        searchEngine.addListener('results', function(results) {
+            this.render(results, false);
+        }.bind(statementList));
+
+        let mainStatements = localStorage.getItem('gherkins.statements');
+
+        if (mainStatements !== null) {
+            mainStatements = JSON.parse(mainStatements);
+        } else {
+            mainStatements = [
+                {
+                    'id': 1,
+                    'type': 'given',
+                    'value': 'I am logged in as :role and :foo or :hello',
+                    'parameters': {
+                        'role': {
+                            'type': 'ACL.Role'
+                        },
+                        'foo': {
+                            'type' : 'bar'
+                        },
+                        'hello': {
+                            'type': 'world'
+                        }
+                    }
+                },
+                {
+                    'id': 2,
+                    'type': 'given',
+                    'value': 'I am on the page :page',
+                    'parameters': {
+                        'page': {
+                            'type': 'URL'
+                        }
+                    }
+                },
+                {
+                    'id': 3,
+                    'type': 'when',
+                    'value': 'I fill the field :field with :value',
+                    'parameters': {
+                        'field': {
+                            'type': 'FormField'
+                        },
+                        'value': {
+                            'type': 'test'
+                        }
+                    }
+                }
+            ];
+
+            for (let i = 4; i <= 1000; i++) {
+                mainStatements.push({
+                    'id': i,
+                    'type': ['given', 'when'][Math.round(Math.random())],
+                    'value': 'I am on the ' + i + 'th position',
+                    'parameters': {
+                        'first': {
+                            'type': 'text'
+                        },
+                        'second': {
+                            'type': 'number'
+                        },
+                        'third': {
+                            'type': 'date'
+                        }
+                    }
+                });
+            }
+
+            localStorage.setItem('gherkins.statements', JSON.stringify(mainStatements));
+        }
+
+
+        mainStatements.forEach(function(statement) {
+            this.indexDocument(statement.id, statement.value, statement);
+            this.indexDocument(statement.id, statement.type, statement);
+
+            if (statement.parameters) {
+                let parameters = Object.keys(statement.parameters),
+                    types = [];
+
+                this.indexDocument(statement.id, parameters.join(' '), statement);
+
+                for (let i = 0; i < parameters.length; i++) {
+                    types.push(statement.parameters[parameters[i]].type);
+                }
+
+                this.indexDocument(statement.id, types.join(' '), statement);
+            }
+        }, searchEngine);
+
+
+        document.getElementById('searchBar').addEventListener('keyup', function(event) {
+            this.searchByPrefix(event.target.value);
+        }.bind(searchEngine));
+
+
+        document.addEventListener('click', function(event) {
+            debugger;
+        });
+
+        searchEngine.start();
+
+        var app = {
+            router: {
+                routes: [
+                    {
+                        path: 'home'
+                    },
+                    {
+                        path: 'behat'
+                    },
+                    {
+                        path: 'form'
+                    }
+                ],
+
+                searchRoute(path) {
+                    for (let i = 0; i < this.routes.length; i++) {
+                        if (this.routes[i].path === path) {
+                            return this.routes[i];
+                        }
+                    }
+
+                    return null;
+                }
+            },
+
+            navigate(hash) {
+                let route = this.router.searchRoute(hash);
+                debugger;
+            }
+        };
+
+        window.onhashchange = function(event) {
+            event.stopPropagation();
+
+            let hash = event.newURL.split('#').pop();
+            this.navigate(hash);
+        }.bind(app);
+    </script>
+</body>
+</html>
