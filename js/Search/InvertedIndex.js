@@ -124,6 +124,13 @@ class InvertedIndex
     listMatchingAndIds(tokens) {
         let matched = [];
 
+        // Sort to speedup the matching process when some elements size is greatly smallest than any other
+        tokens.sort(function(first, second) {
+            return this.tokens[first] !== undefined
+                && this.tokens[second] !== undefined
+                && this.tokens[first].size > this.tokens[second].size;
+        }.bind(this));
+
         for (let i = 0; i < tokens.length; i++) {
             if (this.tokens.hasOwnProperty(tokens[i]) === false) {
                 return [];
