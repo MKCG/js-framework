@@ -31,10 +31,20 @@ Set.prototype.clone = function() {
 }
 
 Set.prototype.intersect = function(other) {
-    let intersection = new Set();
+    let intersection = new Set(),
+        smallest,
+        biggest;
 
-    for (var elem of other) {
-        if (this.has(elem)) {
+    if (this.size < other.size) {
+        smallest = this;
+        biggest = other;
+    } else {
+        smallest = other;
+        biggest = this;
+    }
+
+    for (var elem of smallest) {
+        if (biggest.has(elem)) {
             intersection.add(elem);
         }
     }
@@ -43,9 +53,18 @@ Set.prototype.intersect = function(other) {
 }
 
 Set.prototype.union = function(other) {
-    var union = new Set(this);
+    let union,
+        smallest;
 
-    for (var elem of other) {
+    if (this.size < other.size) {
+        union = new Set(other);
+        smallest = this;
+    } else {
+        union = new Set(this);
+        smallest = other;
+    }
+
+    for (let elem of smallest) {
         union.add(elem);
     }
 
