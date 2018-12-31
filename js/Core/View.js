@@ -5,12 +5,13 @@
  */
 class ViewComponent extends Component
 {
-    constructor(elementId, template, templateEngine) {
+    constructor(elementId, template, templateEngine, builder) {
         super();
 
         this.element = document.getElementById(elementId);
         this.templateEngine = templateEngine;
         this.template = template;
+        this.builder = builder;
     }
 
     render(data, force) {
@@ -22,7 +23,13 @@ class ViewComponent extends Component
             this.templateCompilation = this.templateEngine.parse(this.template);
         }
 
-        this.element.innerHTML = this.templateCompilation.render(data, this);
+        let rendered = this.templateCompilation.render(data, this);
+
+        if (this.element) {
+            this.element.innerHTML = rendered;
+        } else {
+            return rendered;
+        }
     }
 
     mustUpdate(data) {
@@ -42,6 +49,8 @@ class ViewBuilder
 
     create(type, ...params) {
         params.push(this.templateEngine);
+        params.push(this);
+
         return eval(`new ${type}(...params)`);
     }
 }
@@ -67,4 +76,9 @@ class DocumentListView extends ViewComponent
         this.rendered = data.ids;
         super.render({items: data.documents});
     }
+}
+
+class DocumentCardView extends ViewComponent
+{
+
 }

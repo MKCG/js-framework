@@ -18,14 +18,16 @@ class Template
         let result = [];
 
         if (this.computedInnerStruct === undefined) {
-            this.computeInnerStruct();
+            this.computeInnerStruct(component);
         }
 
         for (let i = 0; i < this.computedInnerStruct.length; i++) {
             let current = this.computedInnerStruct[i];
 
-            if (current instanceof Template) {
-                result.push(current.render(data));
+            if (current instanceof TemplateComponentProxy) {
+                result.push(current.render(data, component));
+            } else if (current instanceof Template) {
+                result.push(current.render(data, component));
             } else if (typeof current === "string") {
                 result.push(current);
             } else {
@@ -52,7 +54,7 @@ class Template
         return result.join('');
     }
 
-    computeInnerStruct() {
+    computeInnerStruct(component) {
         this.computedInnerStruct = [];
 
         for (let i = 0; i < this.innerStruct.length; i++) {
@@ -62,7 +64,31 @@ class Template
                 let isParam = current.match(/{{( )*\w+(\.\w+)*(\s*\|\s*\w*)*( )*}}/g) !== null;
 
                 if (isParam === false) {
-                    this.computedInnerStruct.push(current);
+                    let views = current.match(/<[ ]*View (\w*)[ ]*\/>/gi);
+
+                    if (views !== null) {
+                        for (let j = 0; j < views.length; j++) {
+                            let pos = current.search(views[j]);
+
+                            if (pos > 0) {
+                                this.computedInnerStruct.push(current.slice(0, pos));
+                                current = current.slice(pos);
+                            }
+
+                            let innerComponentName = current.slice(0, views[j].length).match(/<[ ]*View (\w*)[ ]*\/>/i)[1],
+                                componentProxy = new TemplateComponentProxy(innerComponentName, component);
+
+                            this.computedInnerStruct.push(componentProxy);
+
+                            current = current.slice(views[j].length);
+                        }
+
+                        if (current !== "") {
+                            this.computedInnerStruct.push(current);
+                        }
+                    } else {
+                        this.computedInnerStruct.push(current);
+                    }
                 } else {
                     let paramList = current.match(/\w+(\.\w+)*/g),
                         paramName = paramList.shift().split('.'),
@@ -80,6 +106,34 @@ class Template
     }
 }
 
+class TemplateComponentProxy
+{
+    constructor(componentName, component) {
+        this.component = component.builder.create(
+            componentName,
+            '',
+            '<div class="card grey z-depth-2">' +
+                '<div class="card-content white-text">' +
+                    '<span class="card-title">{{ type | toUpperCase }} {{ value }}</span>' +
+                    '{{# if parameters.length > 0 }}' +
+                        '<ul>' +
+                            '{{# loop parameters }}' +
+                                '<li>' +
+                                    '{{ _name | toUpperCase }} : {{ type }}' +
+                                '</li>' +
+                            '{{/ loop }}' +
+                        '</ul>' +
+                    '{{/ endif }}' +
+                '</div>' +
+            '</div>'
+        );
+    }
+
+    render(data, component) {
+        return this.component.render(data);
+    }
+}
+
 class TemplateLoop extends Template
 {
     constructor(field, innerStruct) {
@@ -87,14 +141,14 @@ class TemplateLoop extends Template
         this.field = field;
     }
 
-    render(data) {
+    render(data, component) {
         switch (typeof data[this.field]) {
             case 'object':
                 if (Array.isArray(data[this.field])) {
-                    return this.renderArray(data);
+                    return this.renderArray(data, component);
                 }
     
-                return this.renderObject(data);
+                return this.renderObject(data, component);
             case 'undefined':
             default:
                 debugger;
@@ -103,26 +157,26 @@ class TemplateLoop extends Template
         debugger;
     }
 
-    renderArray(data) {
+    renderArray(data, component) {
         let results = [],
             length = data[this.field].length;
 
         for (let i = 0; i < length; i++) {
-            let item = super.render(Object.assign({'_key': i}, data[this.field][i]));
-            results.push(item);10
+            let item = super.render(Object.assign({'_key': i}, data[this.field][i]), component);
+            results.push(item);
         }
 
         return results.join('');
     }
 
-    renderObject(data) {
+    renderObject(data, component) {
         let keys = Object.keys(data[this.field]),
             length = keys.length,
             result = [];
 
         for (let i = 0; i < length; i++) {
             let value = data[this.field][keys[i]],
-                item = super.render(Object.assign({'_key': i, '_name': keys[i]}, value));
+                item = super.render(Object.assign({'_key': i, '_name': keys[i]}, value), component);
 
             result.push(item);
         }
@@ -164,7 +218,7 @@ class TemplateCondition extends Template
         }
     }
 
-    render(data) {
+    render(data, component) {
         let isValid = false,
             result = '',
             value = data[this.field];
@@ -184,7 +238,7 @@ class TemplateCondition extends Template
         }
 
         if (isValid) {
-            result = super.render(data);
+            result = super.render(data, component);
         }
 
         return result;

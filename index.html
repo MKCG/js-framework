@@ -64,26 +64,29 @@
                 '{{# if _key % 2 == 0 }}' +
                     '<div class="row">' +
                 '{{/ endif }}' +
-                '<div id="statement-{{ id }}" class="col s12 m12 l6">' + 
-                    '<div class="card grey z-depth-2">' +
-                        '<div class="card-content white-text">' +
-                            '<span class="card-title">{{ type | toUpperCase }} {{ value }}</span>' +
-                            '{{# if parameters.length > 0 }}' +
-                                '<ul>' +
-                                    '{{# loop parameters }}' +
-                                        '<li>' +
-                                            '{{ _name | toUpperCase }} : {{ type }}' +
-                                        '</li>' +
-                                    '{{/ loop }}' +
-                                '</ul>' +
-                            '{{/ endif }}' +
+                        '<div id="statement-{{ id }}" class="col s12 m12 l6">' +
+                            '<View DocumentCardView  />' +
                         '</div>' +
-                    '</div>' +
-                '</div>' +
                 '{{# if _key % 2 == 1 }}' +
                     '</div>' +
                 '{{/ endif }}' +
             '{{/ loop }}';
+
+        let documentCardTemplate =
+            '<div class="card grey z-depth-2">' +
+                '<div class="card-content white-text">' +
+                    '<span class="card-title">{{ type | toUpperCase }} {{ value }}</span>' +
+                    '{{# if parameters.length > 0 }}' +
+                        '<ul>' +
+                            '{{# loop parameters }}' +
+                                '<li>' +
+                                    '{{ _name | toUpperCase }} : {{ type }}' +
+                                '</li>' +
+                            '{{/ loop }}' +
+                        '</ul>' +
+                    '{{/ endif }}' +
+                '</div>' +
+            '</div>';
 
         const
             viewBuilder = new ViewBuilder(new TemplateEngine()),
