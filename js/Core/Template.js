@@ -109,24 +109,7 @@ class Template
 class TemplateComponentProxy
 {
     constructor(componentName, component) {
-        this.component = component.builder.create(
-            componentName,
-            '',
-            '<div class="card grey z-depth-2">' +
-                '<div class="card-content white-text">' +
-                    '<span class="card-title">{{ type | toUpperCase }} {{ value }}</span>' +
-                    '{{# if parameters.length > 0 }}' +
-                        '<ul>' +
-                            '{{# loop parameters }}' +
-                                '<li>' +
-                                    '{{ _name | toUpperCase }} : {{ type }}' +
-                                '</li>' +
-                            '{{/ loop }}' +
-                        '</ul>' +
-                    '{{/ endif }}' +
-                '</div>' +
-            '</div>'
-        );
+        this.component = component.builder.create(componentName, '');
     }
 
     render(data, component) {
@@ -286,6 +269,18 @@ class TemplateCondition extends Template
 
 class TemplateEngine
 {
+    constructor() {
+        this.templates = [];
+    }
+
+    addTemplate(name, template) {
+        this.templates[name] = template;
+    }
+
+    getTemplate(name) {
+        return this.templates[name] || '';
+    }
+
     parse(text) {
         let tokens = text.match(/\{\{.*?\}}|.+?(?=\{{|$)/g),
             innerStruct = this.buildInnerStruct(tokens),

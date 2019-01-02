@@ -48,6 +48,9 @@ class ViewBuilder
     }
 
     create(type, ...params) {
+        let template = this.templateEngine.getTemplate(type);
+
+        params.push(template);
         params.push(this.templateEngine);
         params.push(this);
 
