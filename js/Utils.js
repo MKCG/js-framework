@@ -70,3 +70,17 @@ Set.prototype.union = function(other) {
 
     return union;
 }
+
+Object.prototype.getNestedValue = function(keys) {
+    if (typeof keys === 'string') {
+        keys = keys.split('.');
+    }
+
+    let value = this;
+
+    while ((key = keys.shift()) && value !== undefined) {
+        value = value[key];
+    }
+
+    return value;
+}

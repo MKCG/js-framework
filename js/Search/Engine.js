@@ -7,30 +7,60 @@ class SearchEngine extends Component
         this.documents = [];
     }
 
-    indexDocument(id, text, data) {
-        this.index.register(id, text);
-        this.documents[id] = data;
+    indexDocument(id, doc, fields) {
+        for (let field of fields) {
+            let value = doc.getNestedValue(field);
+
+            if (typeof value === 'string') {
+                this.index.register(id, value);
+            }
+        }
+
+        this.documents[id] = doc;
     }
 
-    start() {
-        this.searchByPrefix('');
+    start(limit) {
+        this.searchByPrefix('', limit);
     }
 
-    searchByPrefix(value) {
+    searchByPrefix(query, limit) {
         this.notify('search');
 
-        let ids = this.index.searchByPrefix(value),
-            documents = ids.map(function(id) {
+        let ids = this.index.searchByPrefix(query),
+            count = ids.length;
+
+        let documents = ids.slice(0, limit)
+            .map(function(id) {
                 return this.documents[id];
             }.bind(this));
 
-        this.notify('results', {'ids': ids, 'documents': documents});
+        this.notify('results', {
+            'query': query,
+            'ids': ids,
+            'count': count,
+            'documents': documents
+        });
+    }
+
+    suggest(query, limit) {
+        this.notify('suggest');
+
+        let suggestions = this.index.suggest(query, limit);
+
+        this.notify('suggestions', {
+            'query':query,
+            'suggestions': suggestions
+        });
     }
 }
 
 class SearchEngineBuilder
 {
-    static create() {
-        return new SearchEngine(new InvertedIndex());
+    static create(cacheSize, useWorker) {
+        if (useWorker === true) {
+            return new SearchEngine(new InvertedIndex(cacheSize));
+        } else {
+            return new SearchEngine(new InvertedIndex(cacheSize));
+        }
     }
 }

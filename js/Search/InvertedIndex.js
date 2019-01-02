@@ -1,20 +1,23 @@
 class InvertedIndex
 {
-    constructor() {
+    constructor(cacheSize) {
         this.tokens = {};
         this.trackedIds = [];
         this.lastQueries = [];
+        this.radixTree = new RadixTree(1, 1);
+        this.cacheSize = cacheSize;
     }
 
     register(id, value) {
         let tokens = this.tokenize(value);
 
-        for (let i = 0; i < tokens.length; i++) {
-            if (this.tokens.hasOwnProperty(tokens[i]) === false) {
-                this.tokens[tokens[i]] = new Set();
+        for (let token of tokens) {
+            if (this.tokens.hasOwnProperty(token) === false) {
+                this.tokens[token] = new Set();
             }
 
-            this.tokens[tokens[i]].add(id);
+            this.tokens[token].add(id);
+            this.radixTree.add(token);
         }
 
         if (this.trackedIds.indexOf(id) === -1) {
@@ -37,6 +40,32 @@ class InvertedIndex
 
         this.trackedIds.splice(this.trackedIds.indexOf(id), 1);
         this.lastQueries = [];
+    }
+
+    suggest(value, nb) {
+        let tokens = value.normalize('NFD')
+            .replace(/[\u0300-\u036f,!?;:@&#"'\.]/g, "")
+            .split(' ')
+            .filter((v) => v !== '')
+            .map((value) => value.toLowerCase());
+
+        if (tokens.length === 0) {
+            return [];
+        }
+
+        let lastToken = tokens.pop(),
+            phrase = value.split(' ').filter((v) => v !== ''),
+            lastWord = phrase.pop();
+
+        phrase = phrase.join(' ');
+
+        let suggestions = this.radixTree.match(lastToken, nb).map(function(suggestion) {
+            return phrase !== ''
+                ? phrase + ' ' + suggestion
+                : suggestion;
+        }.bind(phrase));
+
+        return suggestions;
     }
 
     search(value) {
@@ -77,10 +106,14 @@ class InvertedIndex
 
         let ids = [];
         let tokens = value.normalize('NFD')
-            .replace(/[\u0300-\u036f,!?;:]/g, "")
+            .replace(/[\u0300-\u036f,!?;:@&#"']/g, "")
             .split(' ')
             .filter((v) => v !== '')
             .map((value) => value.toLowerCase());
+
+        if (tokens.length === 0) {
+            return this.search('');
+        }
 
         let lastToken = tokens.pop();
 
@@ -97,9 +130,7 @@ class InvertedIndex
             }
         }
 
-        let prefixedTokens = Object.keys(this.tokens).filter(function(value) {
-            return value.indexOf(this) === 0;
-        }, lastToken);
+        let prefixedTokens = this.radixTree.match(lastToken);
 
         if (prefixedTokens.length === 0) {
             this.saveQueryResult('searchByPrefix', value, []);
@@ -122,7 +153,7 @@ class InvertedIndex
     }
 
     listMatchingAndIds(tokens) {
-        let matched = [];
+        let matched = new Set();
 
         // Sort to speedup the matching process when some elements size is greatly smallest than any other
         tokens.sort(function(first, second) {
@@ -131,54 +162,46 @@ class InvertedIndex
                 && this.tokens[first].size > this.tokens[second].size;
         }.bind(this));
 
-        for (let i = 0; i < tokens.length; i++) {
-            if (this.tokens.hasOwnProperty(tokens[i]) === false) {
+        for (let token of tokens) {
+            if (this.tokens.hasOwnProperty(token) === false) {
                 return [];
             }
 
-            if (matched.length === 0) {
-                matched = this.tokens[tokens[i]].clone();
-            } else {
-                matched = matched.intersect(this.tokens[tokens[i]]);
-            }
+            matched = matched.size === 0
+                ? this.tokens[token].clone()
+                : matched.intersect(this.tokens[token]);
 
             if (matched.size === 0) {
                 break;
             }
         }
 
-        matched = [...matched];
-
-        return matched;
+        return [...matched];
     }
 
     listMatchingOrIds(tokens) {
-        let matched = [];
+        let matched = new Set();
 
-        for (let i = 0; i < tokens.length; i++) {
-            if (this.tokens.hasOwnProperty(tokens[i]) === false) {
+        for (let token of tokens) {
+            if (this.tokens.hasOwnProperty(token) === false) {
                 return [];
             }
 
-            if (matched.length === 0) {
-                matched = this.tokens[tokens[i]].clone();
-            } else {
-                matched = matched.union(this.tokens[tokens[i]]);
-            }
+            matched = matched.size === 0
+                ? this.tokens[token].clone()
+                : matched.union(this.tokens[token]);
 
             if (matched.size === this.trackedIds.length) {
                 break;
             }
         }
 
-        matched = [...matched];
-
-        return matched;
+        return [...matched];
     }
 
     tokenize(value) {
         return value.normalize('NFD')
-            .replace(/[\u0300-\u036f,!?;:]/g, "")
+            .replace(/[\u0300-\u036f,!?;:@&#"'\.]/g, "")
             .split(' ')
             .filter(function(value, index, array) {
                 return value !== '' && array.indexOf(value) === index;
@@ -195,9 +218,13 @@ class InvertedIndex
     }
 
     saveQueryResult(type, query, result) {
-        this.lastQueries.push({'type': type, 'query': query, 'result': result});
+        this.lastQueries.push({
+            'type': type,
+            'query': query,
+            'result': result
+        });
 
-        if (this.lastQueries.length > 50) {
+        if (this.lastQueries.length > this.cacheSize) {
             this.lastQueries.shift();
         }
     }
