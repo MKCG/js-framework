@@ -70,13 +70,40 @@ class SearchEngine extends Component
     searchByPrefix(query, limit) {
         this.notify('search');
 
-        let ids = this.index.searchByPrefix(query),
-            count = ids.length;
+        let foundIds = this.index.searchByPrefix(query);
 
+        let selectedFacets = {
+            'content.company.product.color': ['azure', 'gold', 'indigo', 'green', 'grey', 'orange'],
+            'content.company.product.name': ['Table', 'Cheese', 'Bike']
+        };
+
+        let ids = new Set(foundIds);
+
+        // for (let facet in selectedFacets) {
+        //     if (selectedFacets.hasOwnProperty(facet) === false) {
+        //         continue;
+        //     }
+
+        //     ids = selectedFacets[facet]
+        //         .map(function(selected) {
+        //             return this[selected] || new Set();
+        //         }.bind(this.facets[facet].values))
+        //         .reduce(function(acc, current) {
+        //             return acc.union(current);
+        //         })
+        //         .intersect(ids);
+        // }
+
+        ids = [...ids];
+
+        // debugger;
+
+        let count = ids.length;
         let documents = ids.slice(0, limit)
             .map(function(id) {
                 return this.documents[id];
             }.bind(this));
+
 
         let facets = {};
 
