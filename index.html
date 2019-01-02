@@ -3,9 +3,11 @@
 <head>
     <title>My Little Resume brewed with love</title>
 
-    <script type="text/javascript" src="js/Utils.js"></script>
+    <!-- External lib for test purposes-->
+    <script type="text/javascript" src="https://rawgit.com/Marak/faker.js/master/examples/browser/js/faker.js"></script>
 
     <!-- Core classes -->
+    <script type="text/javascript" src="js/Utils.js"></script>
     <script type="text/javascript" src="js/Core/Component.js"></script>
     <script type="text/javascript" src="js/Core/View.js"></script>
     <script type="text/javascript" src="js/Core/Template.js"></script>
@@ -13,12 +15,21 @@
     <script type="text/javascript" src="js/Core/Kernel.js"></script>
 
     <!-- Search engine classes -->
+    <script type="text/javascript" src="js/Search/RadixTree.js"></script>
     <script type="text/javascript" src="js/Search/InvertedIndex.js"></script>
     <script type="text/javascript" src="js/Search/Engine.js"></script>
 
+
+    <!-- Design -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css">
     <link rel="stylesheet" href="css/main.css">
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+
+    <style type="text/css">
+        input::-webkit-calendar-picker-indicator {
+            display: none;
+        }
+    </style>
 </head>
 <body>
     <main>
@@ -42,16 +53,17 @@
         <div class="row content">
 
             <div class="col s12 m4 l3 xl2">
-                <ul>
-                    <li>Yo !</li>
-                    <li><a href="#!">Second Sidebar Link</a></li>
+                <ul class="right-align">
+                    <li id="resultCount"></li>
                 </ul>
             </div>
 
             <div class="col s12 m8 l9 xl10">
-                <input type="text" name="searchBar" id="searchBar" placeholder="Rechercher...">
+                <input type="text" name="searchBar" id="searchBar" list="suggestions" placeholder="Rechercher...">
+                <datalist id="suggestions">
+                    <option>Test</option>
+                </datalist>
 
-                <div id="resultCount" class="right-align"></div>
                 <div id="results" class="searchResults"></div>
             </div>
 
@@ -59,7 +71,10 @@
     </main>
 
     <script type="text/javascript">
-        let template =
+        let templateEngine = new TemplateEngine();
+
+        templateEngine.addTemplate(
+            'DocumentListView',
             '{{# loop items }}' +
                 '{{# if _key % 2 == 0 }}' +
                     '<div class="row">' +
@@ -70,29 +85,51 @@
                 '{{# if _key % 2 == 1 }}' +
                     '</div>' +
                 '{{/ endif }}' +
-            '{{/ loop }}';
+            '{{/ loop }}'
+        );
 
-        let documentCardTemplate =
+        // templateEngine.addTemplate(
+        //     'DocumentCardView',
+        //     '<div class="card grey z-depth-2">' +
+        //         '<div class="card-content white-text">' +
+        //             '<span class="card-title">{{ type | toUpperCase }} {{ value }}</span>' +
+        //             '{{# if parameters.length > 0 }}' +
+        //                 '<ul>' +
+        //                     '{{# loop parameters }}' +
+        //                         '<li>' +
+        //                             '{{ _name | toUpperCase }} : {{ type }}' +
+        //                         '</li>' +
+        //                     '{{/ loop }}' +
+        //                 '</ul>' +
+        //             '{{/ endif }}' +
+        //         '</div>' +
+        //     '</div>'
+        // );
+
+
+        templateEngine.addTemplate(
+            'DocumentCardView',
             '<div class="card grey z-depth-2">' +
                 '<div class="card-content white-text">' +
-                    '<span class="card-title">{{ type | toUpperCase }} {{ value }}</span>' +
-                    '{{# if parameters.length > 0 }}' +
-                        '<ul>' +
-                            '{{# loop parameters }}' +
-                                '<li>' +
-                                    '{{ _name | toUpperCase }} : {{ type }}' +
-                                '</li>' +
-                            '{{/ loop }}' +
-                        '</ul>' +
-                    '{{/ endif }}' +
+                    '<span class="card-title">{{ content.lastname | toUpperCase }} {{ content.firstname }}</span>' +
+                    '<br/>{{ content.jobTitle }} at {{ content.company }}' +
+                    '<br /><br />{{ content.presentation }}' +
                 '</div>' +
-            '</div>';
+            '</div>'
+        );
+
+
+
+        templateEngine.addTemplate(
+            'TimerView',
+            '{{ count }} results found in {{ took }}ms'
+        );
 
         const
-            viewBuilder = new ViewBuilder(new TemplateEngine()),
-            searchEngine = SearchEngineBuilder.create(),
-            statementList = viewBuilder.create('DocumentListView', 'results', template),
-            resultCount = viewBuilder.create('TimerView', 'resultCount', '{{ count }} results found in {{ took }}ms');
+            viewBuilder = new ViewBuilder(templateEngine),
+            searchEngine = SearchEngineBuilder.create(50, true),
+            statementList = viewBuilder.create('DocumentListView', 'results'),
+            resultCount = viewBuilder.create('TimerView', 'resultCount');
 
         searchEngine.addListener('search', function() {
             this.startTimer();
@@ -100,14 +137,36 @@
 
         searchEngine.addListener('results', function(results) {
             let took = this.took();
-            this.render({count: results.ids.length, took: took});
+            this.render({count: results.count, took: took});
         }.bind(resultCount));
+
+        searchEngine.addListener('suggestions', function(results) {
+            let element = document.getElementById('suggestions'),
+                template = '<option>{{ suggestion }}</option>';
+
+            let options = results.suggestions.map(function(suggestion) {
+                return this.replace('{{ suggestion }}', suggestion);
+            }.bind(template)).join('');
+
+            element.innerHTML = options;
+
+            console.log(results.suggestions);
+        });
 
         searchEngine.addListener('results', function(results) {
             this.render(results, false);
         }.bind(statementList));
 
+
+        document.getElementById('searchBar').addEventListener('keyup', function(event) {
+            this.searchByPrefix(event.target.value, 50);
+            this.suggest(event.target.value, 5);
+        }.bind(searchEngine));
+
+
+        /*
         let mainStatements = localStorage.getItem('gherkins.statements');
+        mainStatements = null;
 
         if (mainStatements !== null) {
             mainStatements = JSON.parse(mainStatements);
@@ -154,11 +213,13 @@
                 }
             ];
 
-            for (let i = 4; i <= 1000; i++) {
+            for (let i = 4; i <= 10000; i++) {
                 mainStatements.push({
                     'id': i,
                     'type': ['given', 'when'][Math.round(Math.random())],
                     'value': 'I am on the ' + i + 'th position',
+                    'foo': Math.round(Math.random() * 10).toString(),
+                    'bar': Math.round(Math.random() * 4).toString(),
                     'parameters': {
                         'first': {
                             'type': 'text'
@@ -173,13 +234,25 @@
                 });
             }
 
-            localStorage.setItem('gherkins.statements', JSON.stringify(mainStatements));
+            try {
+                // localStorage.setItem('gherkins.statements', JSON.stringify(mainStatements));
+            } catch (e) {
+                debugger;
+            }
         }
 
 
         mainStatements.forEach(function(statement) {
-            this.indexDocument(statement.id, statement.value, statement);
-            this.indexDocument(statement.id, statement.type, statement);
+            statement.baz = '456th';
+            const fields = ['value', 'type', 'foo', 'bar', 'baz'];
+
+            for (let i = 0; i < fields.length; i++) {
+                let value = statement.getNestedValue(fields[i]);
+
+                if (typeof value === 'string') {
+                    this.indexDocument(statement.id, value, statement);
+                }
+            }
 
             if (statement.parameters) {
                 let parameters = Object.keys(statement.parameters),
@@ -194,18 +267,41 @@
                 this.indexDocument(statement.id, types.join(' '), statement);
             }
         }, searchEngine);
+        */
 
 
-        document.getElementById('searchBar').addEventListener('keyup', function(event) {
-            this.searchByPrefix(event.target.value);
+        [...Array(1000).keys()].forEach(function(id) {
+            const fields = [
+                'content.firstname',
+                'content.lastname',
+                'content.jobTitle',
+                'content.presentation',
+                'content.resume',
+                'content.contact.email',
+                'content.company'
+            ];
+
+            let doc = {
+                'id': id,
+                'content': {
+                    'firstname': faker.name.firstName(),
+                    'lastname': faker.name.lastName(),
+                    'jobTitle': faker.name.jobTitle(),
+                    'presentation': [...Array(10).keys()].map((v) => faker.lorem.sentences()).join(' '),
+                    'resume': faker.lorem.paragraphs(),
+                    'contact': {
+                        'email': faker.internet.email()
+                    },
+                    'company': faker.company.companyName()
+                }
+            };
+
+            this.indexDocument(id, doc, fields);
         }.bind(searchEngine));
 
 
-        document.addEventListener('click', function(event) {
-            // debugger;
-        });
 
-        searchEngine.start();
+        searchEngine.start(50);
 
         var app = {
             router: {
