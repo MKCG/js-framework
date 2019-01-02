@@ -111,9 +111,14 @@
             'DocumentCardView',
             '<div class="card grey z-depth-2">' +
                 '<div class="card-content white-text">' +
-                    '<span class="card-title">{{ content.lastname | toUpperCase }} {{ content.firstname }}</span>' +
-                    '<br/>{{ content.jobTitle }} at {{ content.company }}' +
-                    '<br /><br />{{ content.presentation }}' +
+                    '<span class="card-title">' +
+                        '{{ content.lastname | toUpperCase }} {{ content.firstname }}' +
+                    '</span>' +
+                    '{{ content.contact.email }}' +
+                    '<br />{{ content.jobTitle }} at {{ content.company.name }}' +
+                    '<br />' +
+                    '<br />' +
+                    '<br />{{ content.presentation }}' +
                 '</div>' +
             '</div>'
         );
@@ -157,6 +162,10 @@
             this.render(results, false);
         }.bind(statementList));
 
+
+        searchEngine.addListener('results', function(results) {
+            console.log(results.facets);
+        });
 
         document.getElementById('searchBar').addEventListener('keyup', function(event) {
             this.searchByPrefix(event.target.value, 50);
@@ -278,7 +287,14 @@
                 'content.presentation',
                 'content.resume',
                 'content.contact.email',
-                'content.company'
+                'content.company.name'
+            ];
+
+            const facets = [
+                'content.company.product.name',
+                'content.company.product.material',
+                'content.company.product.adjective',
+                'content.company.product.color'
             ];
 
             let doc = {
@@ -292,11 +308,19 @@
                     'contact': {
                         'email': faker.internet.email()
                     },
-                    'company': faker.company.companyName()
+                    'company': {
+                        'name': faker.company.companyName(),
+                        'product': {
+                            'name': faker.commerce.product(),
+                            'material': faker.commerce.productMaterial(),
+                            'adjective': faker.commerce.productAdjective(),
+                            'color': faker.commerce.color()
+                        }
+                    }
                 }
             };
 
-            this.indexDocument(id, doc, fields);
+            this.indexDocument(id, doc, fields, facets);
         }.bind(searchEngine));
 
 

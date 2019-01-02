@@ -9,6 +9,10 @@ class InvertedIndex
     }
 
     register(id, value) {
+        if (typeof value !== 'string') {
+            return;
+        }
+
         let tokens = this.tokenize(value);
 
         for (let token of tokens) {
@@ -159,7 +163,9 @@ class InvertedIndex
         tokens.sort(function(first, second) {
             return this.tokens[first] !== undefined
                 && this.tokens[second] !== undefined
-                && this.tokens[first].size > this.tokens[second].size;
+                && this.tokens[first].size > this.tokens[second].size
+                ? 1
+                : -1;
         }.bind(this));
 
         for (let token of tokens) {
