@@ -129,7 +129,9 @@ class InvertedIndex
                 .reduce((a,v) => a.union(v));
 
             fuzzy = [...fuzzy].filter(function(token) {
-                    return this.levenshtein(token) < 2;
+                    return this.length < 8
+                        ? this.levenshtein(token) < 2
+                        : this.levenshtein(token) < 3;
                 }.bind(token));
 
             let ids = fuzzy.reduce(function(acc, token) {
