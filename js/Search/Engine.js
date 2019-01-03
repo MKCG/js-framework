@@ -1,11 +1,11 @@
 class SearchEngine extends Component
 {
-    constructor(index) {
+    constructor(index, facetManager) {
         super();
 
         this.index = index;
+        this.facetManager = facetManager;
         this.documents = [];
-        this.facets = {};
         this.sortedKeywords
     }
 
@@ -18,32 +18,7 @@ class SearchEngine extends Component
             }
         }
 
-        for (let facet of facets) {
-            let value = doc.getNestedValue(facet);
-
-            if (value === undefined) {
-                continue;
-            }
-
-            if (this.facets[facet] === undefined) {
-                this.facets[facet] = {
-                    'values': {},
-                    // 'sorted': {
-                    //     'type': 'count',
-                    //     'order': 'desc',
-                    //     'values': []
-                    // }
-                };
-            }
-
-            if (this.facets[facet].values[value] === undefined) {
-                this.facets[facet].values[value] = new Set();
-            }
-
-            this.facets[facet].values[value].add(id);
-            // this.facets[facet].sorted.values.push(value);
-        }
-
+        this.facetManager.add(id, doc, facets);
         this.documents[id] = doc;
     }
 
@@ -70,29 +45,26 @@ class SearchEngine extends Component
     searchByPrefix(query, limit) {
         this.notify('search');
 
-        let foundIds = this.index.searchByPrefix(query);
-
         let selectedFacets = {
             'content.company.product.color': ['azure', 'gold', 'indigo', 'green', 'grey', 'orange'],
             'content.company.product.name': ['Table', 'Cheese', 'Bike']
         };
 
+        let start = performance.now();
+
+        let facetIds = this.facetManager.search(selectedFacets);
+
+        let facetTime = performance.now() - start;
+        let searchStart = performance.now();
+
+        let foundIds = this.index.searchByPrefix(query);
+
+        let searchTime = performance.now() - searchStart;
+
+        console.log(facetTime, searchTime);
+        // debugger;
+
         let ids = new Set(foundIds);
-
-        // for (let facet in selectedFacets) {
-        //     if (selectedFacets.hasOwnProperty(facet) === false) {
-        //         continue;
-        //     }
-
-        //     ids = selectedFacets[facet]
-        //         .map(function(selected) {
-        //             return this[selected] || new Set();
-        //         }.bind(this.facets[facet].values))
-        //         .reduce(function(acc, current) {
-        //             return acc.union(current);
-        //         })
-        //         .intersect(ids);
-        // }
 
         ids = [...ids];
 
@@ -107,21 +79,21 @@ class SearchEngine extends Component
 
         let facets = {};
 
-        for (let facet in this.facets) {
-            if (this.facets.hasOwnProperty(facet) === false) {
-                continue;
-            }
+        // for (let facet in this.facets) {
+        //     if (this.facets.hasOwnProperty(facet) === false) {
+        //         continue;
+        //     }
 
-            facets[facet] = [];
+        //     facets[facet] = [];
 
-            for (let keyword in this.facets[facet].values) {
-                if (this.facets[facet].values.hasOwnProperty(keyword) === false) {
-                    continue;
-                }
+        //     for (let keyword in this.facets[facet].values) {
+        //         if (this.facets[facet].values.hasOwnProperty(keyword) === false) {
+        //             continue;
+        //         }
 
-                facets[facet][keyword] = this.facets[facet].values[keyword] && this.facets[facet].values[keyword].intersect(new Set(ids)).size;
-            }
-        }
+        //         facets[facet][keyword] = this.facets[facet].values[keyword] && this.facets[facet].values[keyword].intersect(new Set(ids)).size;
+        //     }
+        // }
 
         this.notify('results', {
             'query': query,
@@ -144,13 +116,84 @@ class SearchEngine extends Component
     }
 }
 
+class FacetManager
+{
+    constructor() {
+        this.facets = {};
+    }
+
+    add(id, doc, facets) {
+        for (let facet of facets) {
+            let value = doc.getNestedValue(facet);
+
+            if (value === undefined) {
+                continue;
+            }
+
+            if (this.facets[facet] === undefined) {
+                this.facets[facet] = {
+                    'values': {},
+                    // 'sorted': {
+                    //     'type': 'count',
+                    //     'order': 'desc',
+                    //     'values': []
+                    // }
+                };
+            }
+
+            if (this.facets[facet].values[value] === undefined) {
+                this.facets[facet].values[value] = new Set();
+            }
+
+            this.facets[facet].values[value].add(id);
+            // this.facets[facet].sorted.values.push(value);
+        }
+    }
+
+    search(selectedFacets) {
+        let foundIds;
+
+        for (let facet in selectedFacets) {
+            if (selectedFacets.hasOwnProperty(facet) === false) {
+                continue;
+            }
+
+            let facetIds = selectedFacets[facet]
+                .map(function(selected) {
+                    return this[selected] || new Set();
+                }.bind(this.facets[facet].values))
+                .reduce(function(acc, current) {
+                    return acc.union(current);
+                });
+
+            if (foundIds !== undefined) {
+                foundIds = foundIds.intersect(facetIds);
+            } else {
+                foundIds = facetIds;
+            }
+
+            if (foundIds.size === 0) {
+                break;
+            }
+        }
+
+        return foundIds;
+    }
+}
+
 class SearchEngineBuilder
 {
     static create(cacheSize, useWorker) {
         if (useWorker === true) {
-            return new SearchEngine(new InvertedIndex(cacheSize));
+            let cpuCores = navigator.hardwareConcurrency || 1;
+
+            // at leat one worker for the inverted index depending on the number of documents => 1 for each 1k documents
+            // at least one worker to handle facets
+            // no more than two workers by cpu core
+
+            return new SearchEngine(new InvertedIndex(cacheSize), new FacetManager());
         } else {
-            return new SearchEngine(new InvertedIndex(cacheSize));
+            return new SearchEngine(new InvertedIndex(cacheSize), new FacetManager());
         }
     }
 }
