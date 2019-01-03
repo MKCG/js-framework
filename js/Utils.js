@@ -84,3 +84,75 @@ Object.prototype.getNestedValue = function(keys) {
 
     return value;
 }
+
+
+String.prototype.maxDiff = function(other, maxNb) {
+    let smallest,
+        biggest;
+
+    if (this.length > other.length) {
+        smallest = other;
+        biggest = this;
+    } else {
+        smallest = this;
+        biggest = other;
+    }
+
+    if (biggest.length - smallest.length > maxNb) {
+        return false;
+    }
+
+    // smallest is a subset of biggest
+    if (biggest.length <= (smallest.length + maxNb) && biggest.indexOf(smallest) !== -1) {
+        return true;
+    }
+
+    if (smallest.length === biggest.length) {
+        for (let i = 0; i < smallest.length; i++) {
+            if (smallest[i] !== biggest[i] && --maxNb < 0) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    return smallest.levenshtein(biggest) <= maxNb;
+}
+
+
+String.prototype.levenshtein = function(other) {
+    if (this.length == 0) {
+        return other.length;
+    }
+
+    if (other.length == 0) {
+        return this.length;
+    }
+
+    let matrix = [];
+
+    for (let i = 0; i <= other.length; i++){
+        matrix[i] = [i];
+    }
+
+    for(let j = 0; j <= this.length; j++){
+        matrix[0][j] = j;
+    }
+
+    for (let i = 1; i <= other.length; i++) {
+        for (let j = 1; j <= this.length; j++) {
+            if (other[i-1] === this[j-1]) {
+                matrix[i][j] = matrix[i-1][j-1];
+            } else {
+                matrix[i][j] = Math.min(
+                    matrix[i-1][j-1] + 1,        // substitution
+                    Math.min(matrix[i][j-1] + 1, // insertion
+                    matrix[i-1][j] + 1)          // deletion
+                );
+            }
+        }
+    }
+
+    return matrix[other.length][this.length];
+}

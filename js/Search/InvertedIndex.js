@@ -4,8 +4,9 @@ class InvertedIndex
         this.tokens = {};
         this.trackedIds = [];
         this.lastQueries = [];
-        this.radixTree = new RadixTree(1, 1);
+        this.radixTree = new RadixTree(3, 1);
         this.cacheSize = cacheSize;
+        this.ngrams = [];
     }
 
     register(id, value) {
@@ -22,6 +23,18 @@ class InvertedIndex
 
             this.tokens[token].add(id);
             this.radixTree.add(token);
+
+            let ngramSize = 2;
+
+            for (let i = 0; i <= token.length - ngramSize; i++) {
+                let ngram = token.slice(i, i + ngramSize);
+
+                if (this.ngrams[ngram] === undefined) {
+                    this.ngrams[ngram] = new Set();
+                }
+
+                this.ngrams[ngram].add(token);
+            }
         }
 
         if (this.trackedIds.indexOf(id) === -1) {
@@ -95,6 +108,50 @@ class InvertedIndex
         this.saveQueryResult('search', value, ids);
 
         return ids;
+    }
+
+    fuzzy(value) {
+        let start = performance.now();
+
+        let tokens = this.tokenize(value),
+            fuzzyIds;
+
+        for (let token of tokens) {
+            let ngrams = new Set();
+
+            for (let i = 0; i <= token.length - 2; i++) {
+                ngrams.add(token.slice(i, i + 2));
+            }
+
+            let fuzzy = [...ngrams].map(function(ngram) {
+                    return this[ngram] || new Set();
+                }.bind(this.ngrams))
+                .reduce((a,v) => a.union(v));
+
+            fuzzy = [...fuzzy].filter(function(token) {
+                    return this.levenshtein(token) < 2;
+                }.bind(token));
+
+            let ids = fuzzy.reduce(function(acc, token) {
+                    return acc.union(this[token]);
+                }.bind(this.tokens), new Set());
+
+            if (fuzzyIds === undefined) {
+                fuzzyIds = ids;
+            } else {
+                fuzzyIds = fuzzyIds.intersect(ids);
+            }
+
+            if (fuzzyIds.size === 0) {
+                break;
+            }
+        }
+
+        let end = performance.now()
+
+        console.log(end - start);
+
+        return [...fuzzyIds];
     }
 
     searchByPrefix(value) {
